@@ -4,6 +4,13 @@
   "description": "msgpack.js, a simple adaptation from github.com/ygoe/msgpack.js",
   "main": "msgpack.js",
   "repository": "github.com/sauldoescode/simple-msgpack.js",
+  "keywords": [
+    "msgpack",
+    "binary",
+    "serialization",
+    "decode",
+    "encode"
+  ],
   "scripts": {
     "test": "./node_modules/.bin/ava ./test.js",
     "build": "./node_modules/.bin/ava ./test.js && ./node_modules/.bin/terser --verbose -c -m -o ./msgpack.min.js -- ./msgpack.js"
