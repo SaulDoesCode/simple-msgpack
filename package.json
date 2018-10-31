@@ -1,0 +1,17 @@
+{
+  "name": "simple-msgpack",
+  "version": "0.0.0",
+  "description": "msgpack.js, a simple adaptation from github.com/ygoe/msgpack.js",
+  "main": "msgpack.js",
+  "repository": "github.com/sauldoescode/simple-msgpack.js",
+  "scripts": {
+    "test": "./node_modules/.bin/ava ./test.js",
+    "build": "./node_modules/.bin/ava ./test.js && ./node_modules/.bin/terser --verbose -c -m -o ./msgpack.min.js -- ./msgpack.js"
+  },
+  "author": "Saul van der Walt",
+  "license": "MIT",
+  "devDependencies": {
+    "ava": "^0.25.0",
+    "terser": "^3.10.7"
+  }
+}
