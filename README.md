@@ -1,4 +1,6 @@
-# msgpack.js
+## msgpack for all
+
+[![Build Status](https://travis-ci.org/SaulDoesCode/simple-msgpack.svg?branch=master)](https://travis-ci.org/SaulDoesCode/simple-msgpack)
 
 ``simple-msgpack`` is an adaptation from [ygeo/msgpack.js](https://github.com/ygoe/msgpack.js)
 this version is ES7+ and will not work in older browsers.
