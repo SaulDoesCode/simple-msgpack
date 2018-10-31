@@ -5,11 +5,11 @@
   "main": "msgpack.min.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sauldoescode/simple-msgpack.js.git"
+    "url": "git+https://github.com/sauldoescode/simple-msgpack.git"
   },
-  "homepage": "https://github.com/sauldoescode/simple-msgpack.js#readme",
+  "homepage": "https://github.com/sauldoescode/simple-msgpack#readme",
   "bugs": {
-    "url": "https://github.com/sauldoescode/simple-msgpack.js/issues"
+    "url": "https://github.com/sauldoescode/simple-msgpack/issues"
   },
   "keywords": [
     "msgpack",
