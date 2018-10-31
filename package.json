@@ -1,6 +1,6 @@
 {
   "name": "simple-msgpack",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "msgpack.js, a simple adaptation from github.com/ygoe/msgpack.js",
   "main": "msgpack.min.js",
   "repository": {
