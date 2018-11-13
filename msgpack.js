@@ -1,18 +1,25 @@
-{// adapted from Yves Goergen's MIT github.com/ygoe/msgpack.js
+{ // adapted from Yves Goergen's MIT github.com/ygoe/msgpack.js
   const pow32 = 0x100000000 // 2^32
   const encode = data => {
+    let floatBuffer, floatView
     let array = new Uint8Array(128)
     let length = 0
     append(data)
 
-    function append(data) {
-      data == null ? appendByte(0xc0) : (
-        data.constructor === String ? appendString :
-        data.constructor === Number ? appendNumber :
-        data.constructor === Boolean ? appendBoolean :
-        Array.isArray(data) ? appendArray :
-        data instanceof Date ? appendDate :
-        appendObject
+    function append (data) {
+      if (data == null) {
+        appendByte(0xc0)
+        return
+      }
+      const ctr = data.constructor
+      ;(
+        ctr === String ? appendString :
+        ctr === Number ? appendNumber :
+          ctr === Boolean ? appendBoolean :
+            ctr === Date ? appendDate :
+              ctr === Uint8Array || ctr === Uint8ClampedArray ? appendBinArray :
+                ctr === Array || ctr === Int8Array || ctr === Int16Array || ctr === Int32Array || ctr === Uint16Array || ctr === Uint32Array || ctr === Float32Array || ctr === Float64Array ? appendArray :
+                  appendObject
       )(data)
     }
 
@@ -70,10 +77,13 @@
         return
       }
       // Float
-      const buffer = new ArrayBuffer(8)
-      new DataView(buffer).setFloat64(0, data)
+      if (!floatView) {
+        floatBuffer = new ArrayBuffer(8)
+        floatView = new DataView(floatBuffer)
+      }
+      floatView.setFloat64(0, data)
       appendByte(0xcb)
-      appendBytes(new Uint8Array(buffer))
+      appendBytes(new Uint8Array(floatBuffer))
     }
 
     function appendString (data) {
@@ -81,9 +91,9 @@
       const len = bytes.length
 
       len <= 0x1f ? appendByte(0xa0 + len) :
-      len <= 0xff ? appendBytes([0xd9, len]) :
-      len <= 0xffff ? appendBytes([0xda, len >>> 8, len]) :
-        appendBytes([0xdb, len >>> 24, len >>> 16, len >>> 8, len])
+        len <= 0xff ? appendBytes([0xd9, len]) :
+          len <= 0xffff ? appendBytes([0xda, len >>> 8, len]) :
+            appendBytes([0xdb, len >>> 24, len >>> 16, len >>> 8, len])
 
       appendBytes(bytes)
     }
@@ -92,10 +102,20 @@
       const len = data.length
 
       len <= 0xf ? appendByte(0x90 + len) :
-      len <= 0xffff ? appendBytes([0xdc, len >>> 8, len]) :
-        appendBytes([0xdd, len >>> 24, len >>> 16, len >>> 8, len])
+        len <= 0xffff ? appendBytes([0xdc, len >>> 8, len]) :
+          appendBytes([0xdd, len >>> 24, len >>> 16, len >>> 8, len])
 
       for (const item of data) append(item)
+    }
+
+    function appendBinArray (data) {
+      const len = data.length
+
+      len <= 0xf ? appendBytes([0xc4, len]) :
+        len <= 0xffff ? appendBytes([0xc5, len >>> 8, len]) :
+          appendBytes([0xc6, len >>> 24, len >>> 16, len >>> 8, len])
+
+      appendBytes(data)
     }
 
     function appendObject (data) {
@@ -103,8 +123,8 @@
       for (const _ in data) len++
 
       len <= 0xf ? appendByte(0x80 + len) :
-      len <= 0xffff ? appendBytes([0xde, len >>> 8, len]) :
-        appendBytes([0xdf, len >>> 24, len >>> 16, len >>> 8, len])
+        len <= 0xffff ? appendBytes([0xde, len >>> 8, len]) :
+          appendBytes([0xdf, len >>> 24, len >>> 16, len >>> 8, len])
 
       for (const key in data) {
         append(key)
@@ -158,17 +178,17 @@
 
     function encodeUtf8 (str) {
       // Prevent excessive array allocation and slicing for all 7-bit characters
-      let ascii = true
-      for (let x = 0; x < str.length; x++) {
-        if (str.charCodeAt(x) >= 128) {
+      let ascii = true, strlen = str.length
+      for (let x = 0; x < strlen; x++) {
+        if (str.charCodeAt(x) > 127) {
           ascii = false
           break
         }
       }
 
-      // Source: https://gist.github.com/pascaldekloe/62546103a1576803dade9269ccf76330
+      // Based on: https://gist.github.com/pascaldekloe/62546103a1576803dade9269ccf76330
       let i = 0, bytes = new Uint8Array(str.length * (ascii ? 1 : 4))
-      for (let ci = 0; ci != str.length; ci++) {
+      for (let ci = 0; ci !== strlen; ci++) {
         let c = str.charCodeAt(ci)
         if (c < 128) {
           bytes[i++] = c
@@ -196,8 +216,10 @@
 
   const decode = array => {
     let pos = 0
+    if (!(array instanceof Uint8Array)) array = new Uint8Array(array)
     // if (pos < array.length) {} // Junk data at the end
-    return read()
+    let data = read()
+    return data
 
     function read () {
       const byte = array[pos++]
@@ -209,9 +231,9 @@
       if (byte === 0xc1) throw new Error('Invalid byte code 0xc1 found.') // never used
       if (byte === 0xc2) return false // false
       if (byte === 0xc3) return true // true
-      if (byte === 0xc4) return readBin(1) // bin 8
-      if (byte === 0xc5) return readBin(2) // bin 16
-      if (byte === 0xc6) return readBin(4) // bin 32
+      if (byte === 0xc4) return readBin(-1, 1) // bin 8
+      if (byte === 0xc5) return readBin(-1, 2) // bin 16
+      if (byte === 0xc6) return readBin(-1, 4) // bin 32
       if (byte === 0xc7) return readExt(-1, 1) // ext 8
       if (byte === 0xc8) return readExt(-1, 2) // ext 16
       if (byte === 0xc9) return readExt(-1, 4) // ext 32
@@ -268,14 +290,14 @@
     }
 
     function readFloat (size) {
-      // Need to select the bytes here because readBin's subarray() is only a view
       const view = new DataView(array.buffer, pos, size)
       pos += size
       if (size === 4) return view.getFloat32(0, false)
       if (size === 8) return view.getFloat64(0, false)
     }
 
-    function readBin (size) {
+    function readBin (size, lengthSize) {
+      if (size < 0) size = readUint(lengthSize)
       const data = array.subarray(pos, pos + size)
       pos += size
       return data
@@ -300,7 +322,9 @@
 
     function readStr (size, lengthSize) {
       if (size < 0) size = readUInt(lengthSize)
-      return decodeUTF8(readBin(size))
+      const start = pos
+      pos += size
+      return decodeUTF8(array, start, size)
     }
 
     function readExt (size, lengthSize) {
@@ -327,29 +351,33 @@
       throw new Error('Invalid data length for a date value.')
     }
 
-    function decodeUTF8 (bytes) {
-      // Source: https://gist.github.com/pascaldekloe/62546103a1576803dade9269ccf76330
-      let i = 0, str = ''
-      while (i < bytes.length) {
+    function decodeUTF8(bytes, start, length) {
+      // Based on: https://gist.github.com/pascaldekloe/62546103a1576803dade9269ccf76330
+      let i = start, str = ''
+      length += start
+      while (i < length) {
         let c = bytes[i++]
         if (c > 127) {
           if (c > 191 && c < 224) {
-            if (i >= bytes.length) throw new Error('UTF8 decode: incomplete 2-byte sequence')
+            if (i >= length)
+              throw new Error('UTF-8 decode: incomplete 2-byte sequence')
             c = (c & 31) << 6 | bytes[i++] & 63
           } else if (c > 223 && c < 240) {
-            if (i + 1 >= bytes.length) throw new Error('UTF8 decode: incomplete 3-byte sequence')
+            if (i + 1 >= length)
+              throw new Error('UTF-8 decode: incomplete 3-byte sequence')
             c = (c & 15) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63
           } else if (c > 239 && c < 248) {
-            if (i + 2 >= bytes.length) throw new Error('UTF8 decode: incomplete 4-byte sequence')
+            if (i + 2 >= length)
+              throw new Error('UTF-8 decode: incomplete 4-byte sequence')
             c = (c & 7) << 18 | (bytes[i++] & 63) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63
-          } else throw new Error('UTF8 decode: unknown multibyte start 0x' + c.toString(16) + ' at index ' + (i - 1))
+          } else throw new Error('UTF-8 decode: unknown multibyte start 0x' + c.toString(16) + ' at index ' + (i - 1))
         }
         if (c <= 0xffff) str += String.fromCharCode(c)
         else if (c <= 0x10ffff) {
           c -= 0x10000
           str += String.fromCharCode(c >> 10 | 0xd800)
           str += String.fromCharCode(c & 0x3FF | 0xdc00)
-        } else throw new Error('UTF8 decode: code point 0x' + c.toString(16) + ' exceeds UTF-16 reach')
+        } else throw new Error('UTF-8 decode: code point 0x' + c.toString(16) + ' exceeds UTF-16 reach')
       }
       return str
     }
